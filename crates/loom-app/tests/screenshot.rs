@@ -78,6 +78,12 @@ fn capture(patch: &Path, flag: &str, name: &str, args: &[&str]) -> Option<(u32, 
     Some((info.width, info.height, pixels))
 }
 
+/// The RGBA pixels of a rectangle in an image `width` pixels wide.
+fn crop(pixels: &[u8], width: u32, x: std::ops::Range<u32>, y: std::ops::Range<u32>) -> Vec<u8> {
+    let row = |r: u32| &pixels[((r * width + x.start) * 4) as usize..((r * width + x.end) * 4) as usize];
+    y.flat_map(row).copied().collect()
+}
+
 /// Number of distinct colours, to tell a drawn patch from a flat fill.
 fn colours(pixels: &[u8]) -> usize {
     let mut seen: Vec<[u8; 4]> = pixels.as_chunks::<4>().0.to_vec();
@@ -154,6 +160,18 @@ fn renders_the_whole_window_with_a_selection() {
     };
     assert_eq!((width, height), (1440, 900));
     assert!(colours(&selected) > 50, "only {} colours", colours(&selected));
+    // Antialiased text gives each strip hundreds of colours. Without its
+    // labels a strip has about ten: the background and widget shapes. The
+    // strips stay clear of the canvas, which draws its own text.
+    let inspector = 1440 - 270;
+    for (name, x, y) in [
+        ("toolbar", 0..1440, 0..30),
+        ("inspector", inspector..1440, 50..870),
+        ("stats bar", 0..1440, 882..900),
+    ] {
+        let n = colours(&crop(&selected, width, x, y));
+        assert!(n > 50, "the {name} has only {n} colours, so its text is missing");
+    }
     // Without a selection the inspector shows no module rows, and the
     // selected tile has no outline.
     let (_, _, plain) = window("window-plain.png", &[]).expect("a GPU, as above");
