@@ -172,6 +172,14 @@ fn renders_the_whole_window_with_a_selection() {
         let n = colours(&crop(&selected, width, x, y));
         assert!(n > 50, "the {name} has only {n} colours, so its text is missing");
     }
+    // Enabled buttons, such as New, fill with the full amber. A button that
+    // draws as disabled is half transparent, so its red stays near 140.
+    let toolbar = crop(&selected, width, 0..1440, 0..30);
+    let amber = toolbar.as_chunks::<4>().0.iter().any(|p| p[0] > 200 && p[2] < 100);
+    assert!(
+        amber,
+        "no enabled button in the toolbar: every button draws as disabled"
+    );
     // Without a selection the inspector shows no module rows, and the
     // selected tile has no outline.
     let (_, _, plain) = window("window-plain.png", &[]).expect("a GPU, as above");

@@ -348,6 +348,17 @@ pub fn run_window(args: &crate::Args, path: &Path) -> Result<(), String> {
     // A new cache, so the canvas starts from the still state.
     let theme = app.theme();
     let mut ui = UserInterface::build(app.view(), logical, Cache::default(), &mut renderer);
+    // Widgets such as buttons take their status from a redraw event, as
+    // the runtime sends before each frame. Without one, every button draws
+    // as disabled. The messages it produces change nothing in this frame.
+    let redraw = iced::Event::Window(iced::window::Event::RedrawRequested(std::time::Instant::now()));
+    let _ = ui.update(
+        &[redraw],
+        mouse::Cursor::Unavailable,
+        &mut renderer,
+        &mut iced::advanced::clipboard::Null,
+        &mut Vec::new(),
+    );
     let style = Style {
         text_color: theme.palette().text,
     };
