@@ -259,7 +259,7 @@ Tests point `--recovery-dir` (or the function behind it) at a temporary folder. 
 - [ ] Given two instances started at the same moment against one recovery folder, then neither deletes or offers the other's session folder (test with two threads or processes, many runs).
 - [ ] Given an orphan with `patch.ron` and no `info.ron`, when restored, then there is no current file.
 - [ ] Given an orphan whose current file has a modification time earlier than `file_modified`, then the offer carries the "has changed" line, and after Restore there is no current file.
-- [ ] Given `--screenshot`, `--dump-ui`, `--control`, or `--no-recovery`, when an orphan exists, then no dialog appears and the orphan is unchanged.
+- [ ] Given `--screenshot`, `--screenshot-window`, `--dump-ui`, `--control`, or `--no-recovery`, when an orphan exists, then no dialog appears and the orphan is unchanged.
 - [ ] On clean exit, and on exit after Don't Save, the session folder is deleted.
 - [ ] Given a write that does not finish (a writer blocked by the test), when the window closes, then the app exits within 2.5 s and the session folder is left for the next start.
 - [ ] Given an orphan whose current file has the same modification time but a different size, then the offer carries the "has changed" line. Given a file that changes while the question is open, then after Restore there is no current file.
