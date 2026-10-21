@@ -45,19 +45,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// The modules a patch can use. Tests also get the `test.` modules from
-/// `loom_test::modules`, which have widgets no built-in module has yet. The
-/// module browser lists only the built-ins.
-fn registry() -> Arc<loom_core::Registry> {
-    #[cfg(test)]
-    {
-        let mut registry = loom_core::Registry::new();
-        loom_modules::register_all(&mut registry).expect("built-in modules are valid and unique");
-        loom_test::modules::register(&mut registry).expect("test modules are valid and unique");
-        Arc::new(registry)
+/// The modules a patch can use: the built-ins, and with `test_modules`
+/// also the `test.` modules from `loom_test::modules`, which have widgets
+/// no built-in module has yet. The app's own tests always get them.
+fn registry(test_modules: bool) -> Arc<loom_core::Registry> {
+    if !(test_modules || cfg!(test)) {
+        return loom_modules::registry();
     }
-    #[cfg(not(test))]
-    loom_modules::registry()
+    let mut registry = loom_core::Registry::new();
+    loom_modules::register_all(&mut registry).expect("built-in modules are valid and unique");
+    loom_test::modules::register(&mut registry).expect("test modules are valid and unique");
+    Arc::new(registry)
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -113,6 +111,12 @@ struct Args {
     /// No autosave and no crash recovery for this run.
     #[arg(long)]
     no_recovery: bool,
+    /// For developers: also load the `test.` modules, which have every
+    /// panel widget, and list them in the module browser. A patch that
+    /// uses them, such as examples/dev/test-widgets.ron, loads only with
+    /// this flag.
+    #[arg(long)]
+    test_modules: bool,
 }
 
 impl Args {
@@ -328,6 +332,8 @@ struct App {
     fake_audio: bool,
     /// The safety stage's mode, for every engine this app builds.
     output_safety: OutputSafety,
+    /// The `test.` modules are loaded (`--test-modules`).
+    test_modules: bool,
     /// Set when the app should exit after this update.
     quit: bool,
     theme: Theme,
@@ -497,14 +503,14 @@ impl App {
             output_safety: args.output_safety,
             ..EngineConfig::with_sample_rate(sample_rate)
         };
-        let session = Self::session(config, source).unwrap_or_else(|e| {
+        let session = Self::session(config, args.test_modules, source).unwrap_or_else(|e| {
             // A copy that reads but does not load (an unknown module) is a
             // failed restore too: the orphan is kept, not adopted.
             match recovered.take() {
                 Some((_, orphan, _)) => restore_error(&e, orphan, &mut notes),
                 None => status = e,
             }
-            Self::session(config, Source::Empty).expect("an empty patch always loads")
+            Self::session(config, args.test_modules, Source::Empty).expect("an empty patch always loads")
         });
         let mut app = Self::assemble(output, sample_rate, session, 1, &args, true);
         // The compile report gives way to anything that needs reading.
@@ -608,13 +614,13 @@ impl App {
 
     /// Builds an engine and loads a patch into it. On failure nothing else
     /// is touched, so a failed open leaves the running patch alone.
-    fn session(config: EngineConfig, source: Source) -> Result<Session, String> {
+    fn session(config: EngineConfig, test_modules: bool, source: Source) -> Result<Session, String> {
         let EngineParts {
             mut controller,
             engine,
             midi,
             telemetry,
-        } = create_engine(registry(), config);
+        } = create_engine(registry(test_modules), config);
         let mut positions = BTreeMap::new();
         let mut load = |patch: &Patch, controller: &mut Controller| -> Result<String, String> {
             patch.load_into(controller).map_err(|e| e.to_string())?;
@@ -732,6 +738,7 @@ impl App {
             no_audio: args.no_audio,
             fake_audio: args.fake_audio,
             output_safety: args.output_safety,
+            test_modules: args.test_modules,
             quit: false,
             theme: Theme::custom(
                 "Loom",
@@ -755,7 +762,12 @@ impl App {
             midi,
             holding: false,
             status,
-            modules: loom_modules::registry().iter().collect(),
+            // The app's tests load the test modules but never list them.
+            modules: if args.test_modules {
+                registry(true).iter().collect()
+            } else {
+                loom_modules::registry().iter().collect()
+            },
             browser: None,
             browser_key: 0,
             frame_key: 0,
@@ -896,7 +908,7 @@ impl App {
             output_safety: self.output_safety,
             ..EngineConfig::with_sample_rate(sample_rate)
         };
-        let session = match Self::session(config, source) {
+        let session = match Self::session(config, self.test_modules, source) {
             Ok(session) => session,
             Err(e) => {
                 let message = format!("Could not open the patch: {e}. The current patch is unchanged.");
@@ -929,6 +941,7 @@ impl App {
             frames: None,
             recovery_dir: None,
             no_recovery: true,
+            test_modules: self.test_modules,
         };
         let mut fresh = Self::assemble(output, sample_rate, session, self.generation + 1, &args, true);
         fresh.animating = self.animating;
@@ -2377,6 +2390,7 @@ mod tests {
             frames: None,
             recovery_dir: None,
             no_recovery: false,
+            test_modules: false,
         }
     }
 
@@ -2545,6 +2559,26 @@ mod tests {
         assert!(assignments(&app).is_empty());
         app.redo();
         assert_eq!(assignments(&app), made);
+    }
+
+    /// `--test-modules` loads the `test.` modules and lists them in the
+    /// module browser, so the example patch for them opens. Without it the
+    /// browser lists only the built-ins, though tests can still add them.
+    #[test]
+    fn test_modules_are_listed_only_with_the_flag() {
+        let patch = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dev/test-widgets.ron");
+        let app = App::new(Args {
+            patch: Some(patch),
+            test_modules: true,
+            ..app_args()
+        });
+        assert_eq!(app.controller.graph().nodes().count(), 2, "{}", app.status);
+        assert_eq!(app.controller.graph().assignments().count(), 7);
+        assert!(app.modules.iter().any(|d| d.id == "test.panel"));
+
+        let app = self::app();
+        assert!(app.modules.iter().any(|d| d.id == "loom.osc.sine"));
+        assert!(!app.modules.iter().any(|d| d.id.starts_with("test.")));
     }
 
     /// A drop on a toggle gives depth 1, and on radio buttons with three

@@ -302,7 +302,7 @@ pub fn headless(args: &Args) -> Result<App, String> {
         output_safety: args.output_safety,
         ..loom_core::EngineConfig::with_sample_rate(48_000.0)
     };
-    let session = App::session(config, args.source())?;
+    let session = App::session(config, args.test_modules, args.source())?;
     let mut app = App::assemble(Err("headless".to_string()), 48_000.0, session, 1, args, false);
     for &id in &args.select {
         if app.controller.graph().node(loom_core::ModuleId(id)).is_none() {

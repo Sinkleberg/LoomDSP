@@ -21,6 +21,8 @@ loom-modules.workspace = true
 loom-patch.workspace = true
 loom-host-desktop.workspace = true
 loom-canvas.workspace = true
+# The `test.` modules, for --test-modules and the app's tests.
+loom-test.workspace = true
 iced_wgpu.workspace = true
 png.workspace = true
 serde.workspace = true
@@ -36,7 +38,6 @@ iced_runtime.workspace = true
 
 [dev-dependencies]
 hound.workspace = true
-loom-test.workspace = true
 
 [lints]
 workspace = true

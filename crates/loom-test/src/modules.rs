@@ -75,7 +75,8 @@ const ON: usize = 4;
 /// | `mode` | whole-number, 0 to 1 | none (the button's mode) |
 ///
 /// Outputs `uni` (unipolar) and `bi` (bipolar) both write `level`. The
-/// light `lit` shows `on`, and the meter reads `uni`.
+/// light `lit` shows `on`, modulated, as of the last frame of the block.
+/// The meter reads `uni`.
 pub static PANEL: ModuleDescriptor = ModuleDescriptor {
     id: "test.panel",
     version: 1,
@@ -94,7 +95,12 @@ pub static PANEL: ModuleDescriptor = ModuleDescriptor {
         param("gate", 0.0, 1.0, 0.0, "").integer(),
         param("mode", 0.0, 1.0, 0.0, "").integer(),
     ],
-    role: ModuleRole::Dsp(|_| Box::new(TestPanel { params: [0.0; 8] })),
+    role: ModuleRole::Dsp(|_| {
+        Box::new(TestPanel {
+            params: [0.0; 8],
+            lit: 0.0,
+        })
+    }),
     panel: Panel::new(
         15,
         8,
@@ -115,11 +121,17 @@ pub static PANEL: ModuleDescriptor = ModuleDescriptor {
 
 struct TestPanel {
     params: [f32; 8],
+    /// `on` at the last frame of the last block, for the light.
+    lit: f32,
 }
 
 impl Module for TestPanel {
     fn process(&mut self, _ctx: &ProcessContext<'_>, io: &mut PortIo<'_>) {
         let level = io.modulated(LEVEL);
+        self.lit = io
+            .modulated(ON)
+            .and_then(|samples| samples.last().copied())
+            .unwrap_or(self.params[ON]);
         let ([], [uni, bi]) = io.split::<0, 2>();
         for (i, (u, b)) in uni.iter_mut().zip(bi.iter_mut()).enumerate() {
             let value = level.map_or(self.params[LEVEL], |samples| samples[i]);
@@ -135,7 +147,7 @@ impl Module for TestPanel {
     }
 
     fn displays(&self, values: &mut [f32]) {
-        values[0] = self.params[ON];
+        values[0] = self.lit;
     }
 }
 

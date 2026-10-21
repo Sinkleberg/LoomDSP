@@ -87,7 +87,8 @@ Every render fails if a port or parameter has an empty label or description, and
 - `test.panel` has one of every widget kind (a knob for a continuous and a whole-number parameter, a toggle, radio buttons with three options, a button, a light, and a meter), every parameter mapping (linear, logarithmic, whole-number, and one smoothed parameter), and one unipolar and one bipolar output.
 - `test.linear`, `test.log`, `test.steps`, and `test.smooth` each have one parameter and one bipolar output `out`, which writes what the engine gave that parameter. A test reads it to see the modulated value.
 - `loom_test::modules::register` adds them all to a registry, which checks their panels.
-- Their IDs start with `test.`, so they never clash with a real module. They never ship: the app registers them only in its own tests, and its module browser does not list them.
+- Their IDs start with `test.`, so they never clash with a real module.
+- The app registers them in its own tests, and in a normal run only with `--test-modules`. Only with that flag does its module browser list them. `examples/dev/test-widgets.ron` uses them: one of each widget, with an assignment on each control. Open it with `--test-modules`, `--dump-ui`, `--screenshot-window`, or the control channel to check a widget by hand. *Why:* some widgets are on no built-in module yet, so a manual check of them needs a patch, and a normal user should never see these modules.
 
 ## Rules
 
