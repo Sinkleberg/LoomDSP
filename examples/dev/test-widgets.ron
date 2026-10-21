@@ -19,9 +19,10 @@ Patch(
         PatchModulation(source: (1, "uni"), target: (2, "level"), depth: 0.25),
         PatchModulation(source: (1, "bi"), target: (2, "cutoff"), depth: -0.25),
         PatchModulation(source: (1, "uni"), target: (2, "steps"), depth: 0.3),
-        // Toggle, radio, and button: the depths a drop gives them (one step).
+        // Toggle and radio: the depths a drop gives them (one step).
         PatchModulation(source: (1, "uni"), target: (2, "on"), depth: 1.0),
         PatchModulation(source: (1, "bi"), target: (2, "choice"), depth: 0.5),
+        // Button: a drop does not reach it, but the inspector can assign it.
         PatchModulation(source: (1, "uni"), target: (2, "gate"), depth: 1.0),
         // An assignment that is off shows as a ring.
         PatchModulation(source: (1, "uni"), target: (2, "glide"), depth: 0.5, enabled: false),
