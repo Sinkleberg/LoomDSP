@@ -36,6 +36,7 @@ iced_runtime.workspace = true
 
 [dev-dependencies]
 hound.workspace = true
+loom-test.workspace = true
 
 [lints]
 workspace = true

@@ -45,6 +45,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// The modules a patch can use. Tests also get the `test.` modules from
+/// `loom_test::modules`, which have widgets no built-in module has yet. The
+/// module browser lists only the built-ins.
+fn registry() -> Arc<loom_core::Registry> {
+    #[cfg(test)]
+    {
+        let mut registry = loom_core::Registry::new();
+        loom_modules::register_all(&mut registry).expect("built-in modules are valid and unique");
+        loom_test::modules::register(&mut registry).expect("test modules are valid and unique");
+        Arc::new(registry)
+    }
+    #[cfg(not(test))]
+    loom_modules::registry()
+}
+
 #[derive(Parser, Debug, Clone)]
 #[command(name = "loom-app", version, about = "LoomDSP desktop app")]
 struct Args {
@@ -599,7 +614,7 @@ impl App {
             engine,
             midi,
             telemetry,
-        } = create_engine(loom_modules::registry(), config);
+        } = create_engine(registry(), config);
         let mut positions = BTreeMap::new();
         let mut load = |patch: &Patch, controller: &mut Controller| -> Result<String, String> {
             patch.load_into(controller).map_err(|e| e.to_string())?;
@@ -2530,6 +2545,51 @@ mod tests {
         assert!(assignments(&app).is_empty());
         app.redo();
         assert_eq!(assignments(&app), made);
+    }
+
+    /// A drop on a toggle gives depth 1, and on radio buttons with three
+    /// options 0.5: one step of the parameter. The assignment follows the
+    /// source's polarity, unipolar or bipolar (spec, Making an assignment).
+    #[test]
+    fn a_drop_on_a_toggle_or_radio_moves_one_step() {
+        let mut app = app();
+        let source = app.controller.add_module("test.panel").unwrap();
+        let target = app.controller.add_module("test.panel").unwrap();
+        app.commit();
+        let d = app.controller.graph().node(target).unwrap().descriptor;
+        let cases = [("on", 1.0), ("choice", 0.5)];
+        let outputs = [(0, loom_core::Polarity::Unipolar), (1, loom_core::Polarity::Bipolar)];
+        for (port, _) in outputs {
+            for (bind, _) in cases {
+                let widget = d.panel.widgets.iter().position(|w| w.bind == bind).unwrap();
+                let _ = app.update(Message::Canvas(CanvasEvent::Assign {
+                    from: loom_canvas::PortRef {
+                        module: source.0,
+                        output: true,
+                        index: port,
+                    },
+                    module: target.0,
+                    widget,
+                }));
+            }
+        }
+
+        let graph = app.controller.graph();
+        assert_eq!(graph.assignments().count(), 4);
+        for (port, polarity) in outputs {
+            for (bind, depth) in cases {
+                let param = d.param_index(bind).unwrap();
+                let made = assignments(&app)
+                    .into_iter()
+                    .find(|a| a.source == OutputRef { module: source, port } && a.param == param)
+                    .unwrap_or_else(|| panic!("no assignment from output {port} to {bind}"));
+                assert_eq!(made.target, target);
+                assert_eq!(made.depth, depth, "{bind}");
+                assert_eq!(made.polarity, None, "{bind} follows the source");
+                let reach = modulation::reach(graph, &made).unwrap();
+                assert_eq!(reach.polarity, polarity, "{bind} from output {port}");
+            }
+        }
     }
 
     /// **Add modulation** makes the same assignment as a drop, from a list
