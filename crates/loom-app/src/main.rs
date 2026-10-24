@@ -2344,7 +2344,7 @@ fn severity_colour(severity: alerts::Severity) -> Color {
     match severity {
         alerts::Severity::Normal => DIM,
         alerts::Severity::Warning => Color::from_rgb8(0xF5, 0xA6, 0x23),
-        alerts::Severity::Alarm => Color::from_rgb8(0xE0, 0x4F, 0x4F),
+        alerts::Severity::Alarm => PALETTE.danger,
     }
 }
 

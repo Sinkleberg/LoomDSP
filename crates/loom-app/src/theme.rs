@@ -9,7 +9,7 @@ pub const PALETTE: iced::theme::Palette = iced::theme::Palette {
     primary: Color::from_rgb8(0xF5, 0xA6, 0x23),
     success: Color::from_rgb8(0x4C, 0xB0, 0x6E),
     warning: Color::from_rgb8(0xE8, 0xD2, 0x4A),
-    danger: Color::from_rgb8(0xE0, 0x4F, 0x4F),
+    danger: Color::from_rgb8(0xF0, 0x6A, 0x6A),
 };
 
 /// Secondary text, including off assignments in the inspector's Drives list.
@@ -70,13 +70,18 @@ mod tests {
         assert!((middle - 0.21404114048223255).abs() < 1e-12);
     }
 
-    /// Guard the text/fill pairs used by the inspector, tiles and badges.
+    /// Guard the text/fill pairs used by the inspector, stats bar, tiles and badges.
     #[test]
     fn text_colours_meet_wcag_minimum() {
         let canvas = loom_canvas::Palette::default();
         for (name, text, background) in [
             ("app dim / app background (Drives)", DIM, PALETTE.background),
             ("app text / app background", PALETTE.text, PALETTE.background),
+            (
+                "stats alarm / app background",
+                crate::severity_colour(crate::alerts::Severity::Alarm),
+                PALETTE.background,
+            ),
             ("canvas text / tile", canvas.text, canvas.tile),
             ("canvas dim label / tile", canvas.text_dim, canvas.tile),
             // gpu.rs fills count badges with modulation; widget.rs draws
